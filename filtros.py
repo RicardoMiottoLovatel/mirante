@@ -3,7 +3,7 @@ import pandas as pd
 import locale
 
 # Configurar locale para formato brasileiro
-locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+# locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
 
 ########################################################################
 # Funções
