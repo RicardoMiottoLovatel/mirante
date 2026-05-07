@@ -15,10 +15,31 @@ def format_br(valor):
 def milhar_br(valor):
     return f"{valor:,}".replace(",", ".")
 
+def formato_br(numero, casas: int = 0) -> str:
+    """Formata número no padrão brasileiro (1.234.567,89)"""
+    if pd.isna(numero) or numero is None:
+        return ""
+    try:
+        return f"{float(numero):,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except:
+        return str(numero)
+
 #########################################################################
 
+st.set_page_config(layout="wide")
+
 st.set_page_config(page_title="Filtro de Municípios IBGE", layout="wide")
-st.title("📊 Seleção de territórios ")
+
+
+st.markdown("""
+<h1 style='text-align: center; margin-bottom: 0;'>
+📊 Mirante Visdata
+</h1>
+
+<p style='text-align: center; color: gray; margin-top: 0;'>
+Análise de indicadores municipais
+</p>
+""", unsafe_allow_html=True)
 
 # Upload do arquivo
 # uploaded_file = st.file_uploader("Carregue seu arquivo CSV", type=["csv"])
@@ -48,14 +69,14 @@ for col in colunas_esperadas:
 #st.success(f"Arquivo carregado com sucesso! {len(df):,} municípios encontrados.")
 
 # ==================== FILTROS NO SIDEBAR ====================
-st.sidebar.header("🔎 Territórios")
+st.sidebar.header("🔎 Seleção")
 
 # 1. Região
 regioes = sorted(df["regiao"].dropna().unique())
 regiao_selecionada = st.sidebar.multiselect(
     "Região",
     options=regioes,
-    default=regioes
+    default=[]
 )
 
 # 2. Estado (UF)
@@ -63,7 +84,7 @@ ufs = sorted(df["sigla_uf"].dropna().unique())
 uf_selecionada = st.sidebar.multiselect(
     "Estado (Sigla UF)",
     options=ufs,
-    default=ufs
+    default=[]
 )
 
 # 3. Nome do Estado (opcional)
@@ -79,7 +100,7 @@ portes = sorted(df["Porte_pop_2022_label"].dropna().unique())
 porte_selecionado = st.sidebar.multiselect(
     "Porte Populacional (2022)",
     options=portes,
-    default=portes
+    default=[]
 )
 
 # 5. Faixa de população (slider)
@@ -124,25 +145,110 @@ if busca_municipio:
     ]
 
 # ==================== RESULTADOS ====================
-st.subheader(f"Resultados: {len(df_filtrado):,} municípios")
+# st.subheader(f"Resultados")
+# st.markdown("<h3 style='text-align: center;'>📊 Resultados</h3>", unsafe_allow_html=True)
+
+st.markdown("""
+<style>
+
+/* Centraliza todo o conteúdo do metric */
+[data-testid="stMetric"] {
+    text-align: center;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Centraliza label */
+[data-testid="stMetricLabel"] {
+    width: 100%;
+    justify-content: center;
+    display: flex;
+}
+
+/* Centraliza valor */
+[data-testid="stMetricValue"] {
+    width: 100%;
+    justify-content: center;
+    display: flex;
+}
+
+/* Centraliza delta */
+[data-testid="stMetricDelta"] {
+    width: 100%;
+    justify-content: center;
+    display: flex;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
 
 # Métricas rápidas
 col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric("Total selecionado", f"{len(df_filtrado):n}")
-with col2:
-    st.metric("População total", f"{df_filtrado['pop_censo_2022'].sum():n}")
-with col3:
-    st.metric("Estados distintos", df_filtrado["sigla_uf"].nunique())
 
+with col1:
+    st.metric(
+        label="Municípios selecionados",
+        value=formato_br(len(df_filtrado))
+    )
+with col2:
+    st.metric(
+        label="População total",
+        value=formato_br(
+            df_filtrado["pop_censo_2022"]
+            .fillna(0)
+            .sum()
+        )
+    )
+
+with col3:
+    st.metric(
+        label="Unidades Federativas",
+        value=formato_br(
+            df_filtrado["sigla_uf"]
+            .dropna()
+            .nunique()
+        )
+    )
+
+    
 # ++++++++++++++++++ CONVERTER A COLUNA DE POPULAÇÃO PARA FORMATO BRASILEIRO ++++++++++++++++++++
 # Formata a coluna com ponto como separador de milhar (formato brasileiro)
 
+df_filtrado["pop_censo_2022_fmt"] = df_filtrado["pop_censo_2022"].apply(lambda x: formato_br(x, 0))
+
+styled_df = df_filtrado.style.set_properties(
+    subset=["pop_censo_2022_fmt"],
+    **{'text-align': 'right'}
+)
+
+# ==================== CSS para alinhamento à direita ====================
+st.markdown("""
+    <style>
+        /* Alinha à direita a coluna "População 2022" - versão mais robusta */
+        div[data-testid="stDataFrame"] table th[data-field="População 2022"],
+        div[data-testid="stDataFrame"] table td[data-field="População 2022"] {
+            text-align: righ;
+        }
+
+        /* Força em todas as células da coluna (caso use classes diferentes) */
+        div[data-testid="stDataFrame"] table td:nth-child(10),
+        div[data-testid="stDataFrame"] table th:nth-child(10) {
+            text-align: right;
+        }
+
+        /* Centraliza todos os cabeçalhos (opcional, mas fica mais bonito) */
+        div[data-testid="stDataFrame"] table th {
+            text-align: center;
+            font-weight: 600;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 # Exibir dataframe (com configuração de colunas) 
 st.dataframe(
     df_filtrado,
-#    use_container_width=True,
+    width="stretch",
     hide_index=True,
     column_config={
         "codigo_ibge": st.column_config.TextColumn("Código IBGE"),
@@ -155,7 +261,13 @@ st.dataframe(
         "uf_municipio": st.column_config.TextColumn("UF-Município"),
         "nome_uf": st.column_config.TextColumn("Nome do Estado"),
         "Porte_pop_2022_label": st.column_config.TextColumn("Porte"),
-        "pop_censo_2022": st.column_config.NumberColumn("População 2022", format="%d"),
+       
+        "pop_censo_2022_fmt": st.column_config.NumberColumn(
+            "População 2022", 
+            help="População segundo o Censo 2022"
+        ),
+
+        "pop_censo_2022": None,  # Esconde a coluna original de população
         "Porte_pop_2022": None,
     }
 )
