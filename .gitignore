@@ -8,5 +8,5 @@ wheels/
 
 # Virtual environments
 .venv
-POP_IBGE.csv
-POP2025_20260113.xls
+.csv
+.xls
